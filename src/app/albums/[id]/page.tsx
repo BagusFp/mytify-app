@@ -108,7 +108,7 @@ export default function AlbumPage({ params }: AlbumPageProps) {
           )}
           <div className="flex-1">
             <p className="text-xs font-bold uppercase text-muted-foreground mb-1">Album / Playlist</p>
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight leading-tight">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold tracking-tight leading-tight">
               {album.title}
             </h1>
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-2 gap-y-1 text-sm mt-3 text-muted-foreground">

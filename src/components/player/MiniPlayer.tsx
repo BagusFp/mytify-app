@@ -4,11 +4,12 @@ import { useCallback } from 'react';
 import Image from 'next/image';
 import {
   Play, Pause, SkipBack, SkipForward, Volume2, VolumeX,
-  Shuffle, Repeat, Repeat1, Heart, ListMusic
+  Shuffle, Repeat, Repeat1, Heart, ListMusic, Mic2
 } from 'lucide-react';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useFavoritesStore } from '@/stores/favoritesStore';
-import { useAudioEngine } from '@/hooks/useAudioEngine';
+import { useLyricsStore } from '@/stores/lyricsStore';
+import { useAudioControls } from '@/hooks/useAudioEngine';
 import { cn, formatDuration } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
@@ -21,7 +22,8 @@ export function MiniPlayer() {
     toggleShuffle, cycleRepeat, setShowFullPlayer, showFullPlayer,
   } = usePlayerStore();
   const { isFavorite, toggleFavorite } = useFavoritesStore();
-  const { seek } = useAudioEngine();
+  const { showLyrics, toggleLyrics, setShowLyrics } = useLyricsStore();
+  const { seek } = useAudioControls();
 
   const isFav = currentTrack ? isFavorite(currentTrack.youtubeId) : false;
 
@@ -29,6 +31,19 @@ export function MiniPlayer() {
     if (!currentTrack) return;
     toggleFavorite(currentTrack);
   }, [currentTrack, toggleFavorite]);
+
+  const handleLyricsClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!showFullPlayer) {
+        setShowFullPlayer(true);
+        setShowLyrics(true);
+      } else {
+        toggleLyrics();
+      }
+    },
+    [showFullPlayer, setShowFullPlayer, setShowLyrics, toggleLyrics]
+  );
 
   if (!currentTrack) return null;
 
@@ -171,7 +186,19 @@ export function MiniPlayer() {
           </div>
 
           {/* Right: Queue + Volume */}
-          <div className="flex items-center gap-3 w-[30%] justify-end min-w-[200px]">
+          <div className="flex items-center gap-3 w-[30%] justify-end min-w-[240px]">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                'h-8 w-8 text-zinc-400 hover:text-white transition-colors',
+                showLyrics && 'text-primary hover:text-primary'
+              )}
+              onClick={handleLyricsClick}
+              title="Lyrics"
+            >
+              <Mic2 className="w-4.5 h-4.5" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -235,6 +262,18 @@ export function MiniPlayer() {
 
           {/* Right: Actions */}
           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                'h-10 w-10 text-zinc-400 transition-all hover:scale-110 active:scale-90',
+                showLyrics && 'text-primary'
+              )}
+              onClick={handleLyricsClick}
+              title="Lyrics"
+            >
+              <Mic2 className="w-5 h-5" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"

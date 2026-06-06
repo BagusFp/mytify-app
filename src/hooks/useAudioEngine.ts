@@ -10,7 +10,7 @@ import { Track } from '@/types';
  */
 let globalAudio: HTMLAudioElement | null = null;
 
-function getGlobalAudio(): HTMLAudioElement {
+export function getGlobalAudio(): HTMLAudioElement {
   if (typeof window === 'undefined') throw new Error('No window');
   if (!globalAudio) {
     globalAudio = new Audio();
@@ -206,6 +206,12 @@ export function useAudioEngine() {
       usePlayerStore.getState().playPrevious()
     );
   }, [currentTrack, setIsPlaying, playNext]);
+
+  return {};
+}
+
+export function useAudioControls() {
+  const setPlaybackPosition = usePlayerStore((s) => s.setPlaybackPosition);
 
   // Seek function
   const seek = useCallback((seconds: number) => {

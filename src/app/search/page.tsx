@@ -8,6 +8,7 @@ import { SearchResult, Track, Artist, Album } from '@/types';
 import { TrackItem } from '@/components/track/TrackItem';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { InfiniteScroll } from '@/components/ui/InfiniteScroll';
 
 type SearchTab = 'all' | 'songs' | 'artists' | 'albums';
 
@@ -34,6 +35,19 @@ export default function SearchPage() {
   const [hasSearched, setHasSearched] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Pagination states
+  const [songsPage, setSongsPage] = useState(1);
+  const [songsHasMore, setSongsHasMore] = useState(true);
+  const [isSongsLoadingMore, setIsSongsLoadingMore] = useState(false);
+
+  const [artistsPage, setArtistsPage] = useState(1);
+  const [artistsHasMore, setArtistsHasMore] = useState(true);
+  const [isArtistsLoadingMore, setIsArtistsLoadingMore] = useState(false);
+
+  const [albumsPage, setAlbumsPage] = useState(1);
+  const [albumsHasMore, setAlbumsHasMore] = useState(true);
+  const [isAlbumsLoadingMore, setIsAlbumsLoadingMore] = useState(false);
+
   const doSearch = useCallback(async (q: string) => {
     if (q.trim().length < 2) {
       setSongs([]);
@@ -44,6 +58,15 @@ export default function SearchPage() {
     }
     setIsLoading(true);
     setError(null);
+
+    // Reset pagination states
+    setSongsPage(1);
+    setSongsHasMore(true);
+    setArtistsPage(1);
+    setArtistsHasMore(true);
+    setAlbumsPage(1);
+    setAlbumsHasMore(true);
+
     try {
       const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
       if (!res.ok) {
@@ -80,6 +103,91 @@ export default function SearchPage() {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [query, doSearch]);
+
+  const loadMoreSongs = useCallback(async () => {
+    if (isSongsLoadingMore || !songsHasMore || !query) return;
+    setIsSongsLoadingMore(true);
+    try {
+      const nextPage = songsPage + 1;
+      const res = await fetch(
+        `/api/search?q=${encodeURIComponent(query)}&type=songs&page=${nextPage}&limit=20`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const newSongs: Track[] = (data.songs || []).map((item: SearchResult) => ({
+          id: item.youtubeId,
+          youtubeId: item.youtubeId,
+          title: item.title,
+          thumbnail: item.thumbnail,
+          duration: item.duration,
+          channelName: item.channelName,
+          channelId: item.channelId,
+        }));
+        
+        setSongs((prev) => {
+          const existingIds = new Set(prev.map((s) => s.youtubeId));
+          const filtered = newSongs.filter((s) => !existingIds.has(s.youtubeId));
+          return [...prev, ...filtered];
+        });
+        setSongsHasMore(data.hasMore);
+        setSongsPage(nextPage);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSongsLoadingMore(false);
+    }
+  }, [songsPage, songsHasMore, query, isSongsLoadingMore]);
+
+  const loadMoreArtists = useCallback(async () => {
+    if (isArtistsLoadingMore || !artistsHasMore || !query) return;
+    setIsArtistsLoadingMore(true);
+    try {
+      const nextPage = artistsPage + 1;
+      const res = await fetch(
+        `/api/search?q=${encodeURIComponent(query)}&type=artists&page=${nextPage}&limit=20`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setArtists((prev) => {
+          const existingIds = new Set(prev.map((a) => a.id));
+          const filtered = (data.artists || []).filter((a: any) => !existingIds.has(a.id));
+          return [...prev, ...filtered];
+        });
+        setArtistsHasMore(data.hasMore);
+        setArtistsPage(nextPage);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsArtistsLoadingMore(false);
+    }
+  }, [artistsPage, artistsHasMore, query, isArtistsLoadingMore]);
+
+  const loadMoreAlbums = useCallback(async () => {
+    if (isAlbumsLoadingMore || !albumsHasMore || !query) return;
+    setIsAlbumsLoadingMore(true);
+    try {
+      const nextPage = albumsPage + 1;
+      const res = await fetch(
+        `/api/search?q=${encodeURIComponent(query)}&type=albums&page=${nextPage}&limit=20`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setAlbums((prev) => {
+          const existingIds = new Set(prev.map((a) => a.id));
+          const filtered = (data.albums || []).filter((a: any) => !existingIds.has(a.id));
+          return [...prev, ...filtered];
+        });
+        setAlbumsHasMore(data.hasMore);
+        setAlbumsPage(nextPage);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsAlbumsLoadingMore(false);
+    }
+  }, [albumsPage, albumsHasMore, query, isAlbumsLoadingMore]);
 
   const handleSuggestionClick = (s: string) => {
     setQuery(s);
@@ -190,6 +298,13 @@ export default function SearchPage() {
                   />
                 ))}
               </div>
+              {activeTab === 'songs' && (
+                <InfiniteScroll
+                  onLoadMore={loadMoreSongs}
+                  hasMore={songsHasMore}
+                  isLoading={isSongsLoadingMore}
+                />
+              )}
             </div>
           )}
 
@@ -236,6 +351,13 @@ export default function SearchPage() {
                   </Link>
                 ))}
               </div>
+              {activeTab === 'artists' && (
+                <InfiniteScroll
+                  onLoadMore={loadMoreArtists}
+                  hasMore={artistsHasMore}
+                  isLoading={isArtistsLoadingMore}
+                />
+              )}
             </div>
           )}
 
@@ -282,6 +404,13 @@ export default function SearchPage() {
                   </Link>
                 ))}
               </div>
+              {activeTab === 'albums' && (
+                <InfiniteScroll
+                  onLoadMore={loadMoreAlbums}
+                  hasMore={albumsHasMore}
+                  isLoading={isAlbumsLoadingMore}
+                />
+              )}
             </div>
           )}
         </div>

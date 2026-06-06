@@ -5,16 +5,18 @@ import Image from 'next/image';
 import Link from 'next/link';
 import {
   Play, Pause, SkipBack, SkipForward, Volume2, VolumeX,
-  Shuffle, Repeat, Repeat1, ChevronDown, Heart, ListMusic, Trash2
+  Shuffle, Repeat, Repeat1, ChevronDown, Heart, ListMusic, Trash2, Mic2
 } from 'lucide-react';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useFavoritesStore } from '@/stores/favoritesStore';
-import { useAudioEngine } from '@/hooks/useAudioEngine';
+import { useLyricsStore } from '@/stores/lyricsStore';
+import { useAudioControls } from '@/hooks/useAudioEngine';
 import { cn, formatDuration } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { TrackItem } from '@/components/track/TrackItem';
+import { LyricsView } from './LyricsView';
 
 export function FullPlayer() {
   const {
@@ -24,7 +26,8 @@ export function FullPlayer() {
     toggleShuffle, cycleRepeat, setShowFullPlayer, showFullPlayer, clearQueue
   } = usePlayerStore();
   const { isFavorite, toggleFavorite } = useFavoritesStore();
-  const { seek } = useAudioEngine();
+  const { showLyrics, toggleLyrics, setShowLyrics } = useLyricsStore();
+  const { seek } = useAudioControls();
 
   // Mobile queue toggle state
   const [showMobileQueue, setShowMobileQueue] = useState(false);
@@ -33,6 +36,17 @@ export function FullPlayer() {
   const [translateY, setTranslateY] = useState(0);
   const touchStartY = useRef(0);
   const isSwiping = useRef(false);
+
+  const handleMobileQueueToggle = () => {
+    setShowMobileQueue(!showMobileQueue);
+    setShowLyrics(false);
+  };
+
+  const handleMobileLyricsToggle = () => {
+    const nextVal = !showLyrics;
+    setShowLyrics(nextVal);
+    setShowMobileQueue(false);
+  };
 
   const isFav = currentTrack ? isFavorite(currentTrack.youtubeId) : false;
 
@@ -239,14 +253,36 @@ export function FullPlayer() {
 
         </div>
 
-        {/* Right pane: Queue list */}
-        <div className="w-96 border-l border-zinc-900 bg-zinc-950/80 flex flex-col h-full">
-          <div className="flex items-center justify-between p-6 pb-4 border-b border-zinc-900">
-            <div className="flex items-center gap-2">
-              <ListMusic className="w-5 h-5 text-primary" />
-              <h3 className="font-bold text-white text-base">Next up ({upcomingQueue.length})</h3>
+        {/* Right pane: Queue list or Lyrics */}
+        <div className="w-96 border-l border-zinc-900 bg-zinc-950/80 flex flex-col h-full overflow-hidden">
+          <div className="flex items-center justify-between p-6 pb-4 border-b border-zinc-900 flex-shrink-0">
+            <div className="flex items-center gap-4 select-none">
+              <button
+                onClick={() => setShowLyrics(false)}
+                className={cn(
+                  'font-bold text-sm transition-colors relative py-1',
+                  !showLyrics ? 'text-white' : 'text-zinc-500 hover:text-white'
+                )}
+              >
+                Next Up ({upcomingQueue.length})
+                {!showLyrics && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+                )}
+              </button>
+              <button
+                onClick={() => setShowLyrics(true)}
+                className={cn(
+                  'font-bold text-sm transition-colors relative py-1',
+                  showLyrics ? 'text-white' : 'text-zinc-500 hover:text-white'
+                )}
+              >
+                Lyrics
+                {showLyrics && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+                )}
+              </button>
             </div>
-            {upcomingQueue.length > 0 && (
+            {!showLyrics && upcomingQueue.length > 0 && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -257,20 +293,24 @@ export function FullPlayer() {
               </Button>
             )}
           </div>
-          <ScrollArea className="flex-1">
-            <div className="p-4 space-y-1">
-              {upcomingQueue.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-24 text-center text-zinc-500">
-                  <ListMusic className="w-12 h-12 mb-3 opacity-20" />
-                  <p className="text-sm">Queue is empty</p>
-                </div>
-              ) : (
-                upcomingQueue.map((t, i) => (
-                  <TrackItem key={`${t.youtubeId}-${i}`} track={t} index={i + 1} showIndex />
-                ))
-              )}
-            </div>
-          </ScrollArea>
+          {showLyrics ? (
+            <LyricsView className="flex-1" />
+          ) : (
+            <ScrollArea className="flex-1">
+              <div className="p-4 space-y-1">
+                {upcomingQueue.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-24 text-center text-zinc-500">
+                    <ListMusic className="w-12 h-12 mb-3 opacity-20" />
+                    <p className="text-sm">Queue is empty</p>
+                  </div>
+                ) : (
+                  upcomingQueue.map((t, i) => (
+                    <TrackItem key={`${t.youtubeId}-${i}`} track={t} index={i + 1} showIndex />
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          )}
         </div>
 
       </div>
@@ -301,21 +341,37 @@ export function FullPlayer() {
             <ChevronDown className="w-6 h-6" />
           </Button>
           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 select-none">
-            {showMobileQueue ? 'Play Queue' : 'Now Playing'}
+            {showLyrics ? 'Lyrics' : showMobileQueue ? 'Play Queue' : 'Now Playing'}
           </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn('h-10 w-10 rounded-full transition-colors', showMobileQueue ? 'text-primary' : 'text-zinc-400')}
-            onClick={() => setShowMobileQueue(!showMobileQueue)}
-            title="Toggle Queue"
-          >
-            <ListMusic className="w-5 h-5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn('h-10 w-10 rounded-full transition-colors', showLyrics ? 'text-primary' : 'text-zinc-400')}
+              onClick={handleMobileLyricsToggle}
+              title="Toggle Lyrics"
+            >
+              <Mic2 className="w-5 h-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn('h-10 w-10 rounded-full transition-colors', showMobileQueue ? 'text-primary' : 'text-zinc-400')}
+              onClick={handleMobileQueueToggle}
+              title="Toggle Queue"
+            >
+              <ListMusic className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
 
         {/* Dynamic Mobile Center Panel */}
-        {showMobileQueue ? (
+        {showLyrics ? (
+          // Mobile Lyrics View
+          <div className="flex-1 flex flex-col h-0 my-4 bg-black/20 rounded-2xl border border-zinc-900 overflow-hidden">
+            <LyricsView className="flex-1" />
+          </div>
+        ) : showMobileQueue ? (
           // Mobile Queue View
           <div className="flex-1 flex flex-col h-0 my-4 bg-black/20 rounded-2xl border border-zinc-900">
             <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-900 flex-shrink-0">

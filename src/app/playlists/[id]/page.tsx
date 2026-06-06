@@ -81,7 +81,7 @@ export default function PlaylistPage({ params }: PlaylistPageProps) {
           </div>
           <div>
             <p className="text-xs font-bold uppercase text-muted-foreground mb-1">Playlist</p>
-            <h1 className="text-4xl font-black">{playlist.name}</h1>
+            <h1 className="text-4xl font-serif font-bold">{playlist.name}</h1>
             <p className="text-muted-foreground mt-2">{tracks.length} songs</p>
           </div>
         </div>

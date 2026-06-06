@@ -5,6 +5,7 @@ export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams.get('q');
   const limit = parseInt(request.nextUrl.searchParams.get('limit') ?? '20');
   const type = request.nextUrl.searchParams.get('type'); // 'songs' | 'albums' | 'artists' | 'all'
+  const page = parseInt(request.nextUrl.searchParams.get('page') ?? '1');
 
   if (!query || query.trim().length < 2) {
     return NextResponse.json({ error: 'Query must be at least 2 characters' }, { status: 400 });
@@ -13,14 +14,20 @@ export async function GET(request: NextRequest) {
   try {
     const q = query.trim();
     if (type === 'songs') {
-      const songs = await searchYouTube(q, limit);
-      return NextResponse.json({ songs });
+      const fetchCount = page * limit;
+      const allSongs = await searchYouTube(q, fetchCount);
+      const songs = allSongs.slice((page - 1) * limit, page * limit);
+      return NextResponse.json({ songs, hasMore: allSongs.length >= fetchCount });
     } else if (type === 'albums') {
-      const albums = await searchAlbums(q, limit);
-      return NextResponse.json({ albums });
+      const fetchCount = page * limit;
+      const allAlbums = await searchAlbums(q, fetchCount);
+      const albums = allAlbums.slice((page - 1) * limit, page * limit);
+      return NextResponse.json({ albums, hasMore: allAlbums.length >= fetchCount });
     } else if (type === 'artists') {
-      const artists = await searchArtists(q, limit);
-      return NextResponse.json({ artists });
+      const fetchCount = page * limit;
+      const allArtists = await searchArtists(q, fetchCount);
+      const artists = allArtists.slice((page - 1) * limit, page * limit);
+      return NextResponse.json({ artists, hasMore: allArtists.length >= fetchCount });
     } else {
       // Fetch all three concurrently
       const [songs, albums, artists] = await Promise.all([

@@ -98,8 +98,8 @@ export default function LibraryPage() {
 
   return (
     <div className="p-6 page-enter">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-black">Your Library</h1>
+      <div className="flex items-center justify-between mb-6 select-none">
+        <h1 className="text-3xl font-black">Playlists ({playlists.length})</h1>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger render={
             <Button className="btn-green gap-2">

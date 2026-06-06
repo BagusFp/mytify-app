@@ -125,8 +125,8 @@ export default function HomePage() {
       <div className="hidden md:block p-8 space-y-12">
         {/* Header */}
         <div>
-          <h1 className="text-4xl font-black tracking-tight text-white">{greeting} 👋</h1>
-          <p className="text-zinc-400 mt-1 text-sm">Welcome back. What would you like to listen to today?</p>
+          <h1 className="text-[44px] lg:text-[48px] font-extrabold tracking-tight text-white leading-tight">{greeting} 👋</h1>
+          <p className="text-zinc-400 mt-1.5 text-sm font-normal">Welcome back. Continue listening where you left off.</p>
         </div>
 
         {/* Quick Links Grid */}
@@ -209,7 +209,7 @@ export default function HomePage() {
       <div className="block md:hidden p-4 space-y-8">
         {/* Header */}
         <div className="px-1">
-          <h1 className="text-2xl font-black text-white leading-tight">{greeting} 👋</h1>
+          <h1 className="text-[28px] sm:text-[32px] font-extrabold text-white leading-tight">{greeting} 👋</h1>
         </div>
 
         {/* Compact Quick Actions list */}

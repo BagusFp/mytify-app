@@ -27,9 +27,32 @@ async function upsertTrack(track: {
 }
 
 // GET /api/history
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     await ensureDefaultUser();
+    const page = request.nextUrl.searchParams.get('page');
+    const limit = request.nextUrl.searchParams.get('limit');
+
+    if (page || limit) {
+      const p = parseInt(page ?? '1');
+      const l = parseInt(limit ?? '20');
+      const history = await prisma.history.findMany({
+        where: { userId: DEFAULT_USER_ID },
+        include: { track: true },
+        orderBy: { playedAt: 'desc' },
+        skip: (p - 1) * l,
+        take: l,
+      });
+      const total = await prisma.history.count({
+        where: { userId: DEFAULT_USER_ID },
+      });
+      return NextResponse.json({
+        history,
+        total,
+        hasMore: p * l < total,
+      });
+    }
+
     const history = await prisma.history.findMany({
       where: { userId: DEFAULT_USER_ID },
       include: { track: true },

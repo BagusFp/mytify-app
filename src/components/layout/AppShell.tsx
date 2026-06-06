@@ -6,6 +6,7 @@ import { Sidebar, BottomNav } from '@/components/layout/Navigation';
 import { MiniPlayer } from '@/components/player/MiniPlayer';
 import { FullPlayer } from '@/components/player/FullPlayer';
 import { usePlayerStore } from '@/stores/playerStore';
+import { useAudioEngine } from '@/hooks/useAudioEngine';
 import { Toaster } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/layout/Header';
@@ -15,6 +16,8 @@ interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
+  useAudioEngine(); // Run the global audio engine singleton
+
   const { fetchPlaylists, fetchFavorites } = useLibraryStore();
   const { currentTrack } = usePlayerStore();
 

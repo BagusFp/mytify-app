@@ -27,9 +27,32 @@ async function upsertTrack(track: {
 }
 
 // GET /api/favorites
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     await ensureDefaultUser();
+    const page = request.nextUrl.searchParams.get('page');
+    const limit = request.nextUrl.searchParams.get('limit');
+
+    if (page || limit) {
+      const p = parseInt(page ?? '1');
+      const l = parseInt(limit ?? '20');
+      const favorites = await prisma.favorite.findMany({
+        where: { userId: DEFAULT_USER_ID },
+        include: { track: true },
+        orderBy: { createdAt: 'desc' },
+        skip: (p - 1) * l,
+        take: l,
+      });
+      const total = await prisma.favorite.count({
+        where: { userId: DEFAULT_USER_ID },
+      });
+      return NextResponse.json({
+        favorites,
+        total,
+        hasMore: p * l < total,
+      });
+    }
+
     const favorites = await prisma.favorite.findMany({
       where: { userId: DEFAULT_USER_ID },
       include: { track: true },

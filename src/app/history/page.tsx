@@ -1,12 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
-import { Clock, Trash2 } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { Clock } from 'lucide-react';
 import Link from 'next/link';
-import { useLibraryStore } from '@/stores/libraryStore';
 import { Track } from '@/types';
 import { TrackItem } from '@/components/track/TrackItem';
-import { formatDuration } from '@/lib/utils';
+import { InfiniteScroll } from '@/components/ui/InfiniteScroll';
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
@@ -24,30 +23,77 @@ function formatDate(dateStr: string): string {
 }
 
 export default function HistoryPage() {
-  const { historyEntries, fetchHistory, isLoading } = useLibraryStore();
+  const [entries, setEntries] = useState<any[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  const loadInitial = useCallback(async () => {
+    setInitialLoading(true);
+    try {
+      const res = await fetch('/api/history?page=1&limit=20');
+      if (res.ok) {
+        const data = await res.json();
+        setEntries(data.history);
+        setTotalCount(data.total);
+        setHasMore(data.hasMore);
+        setPage(1);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setInitialLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchHistory();
-  }, [fetchHistory]);
+    loadInitial();
+  }, [loadInitial]);
 
-  const tracks: Track[] = historyEntries
-    .map((h) => h.track)
+  const loadMore = useCallback(async () => {
+    if (isFetchingMore || !hasMore) return;
+    setIsFetchingMore(true);
+    try {
+      const nextPage = page + 1;
+      const res = await fetch(`/api/history?page=${nextPage}&limit=20`);
+      if (res.ok) {
+        const data = await res.json();
+        setEntries((prev) => {
+          const existingIds = new Set(prev.map((e) => e.id));
+          const filtered = data.history.filter((e: any) => !existingIds.has(e.id));
+          return [...prev, ...filtered];
+        });
+        setTotalCount(data.total);
+        setHasMore(data.hasMore);
+        setPage(nextPage);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsFetchingMore(false);
+    }
+  }, [page, hasMore, isFetchingMore]);
+
+  const tracks: Track[] = entries
+    .map((e) => e.track)
     .filter((t): t is Track => !!t);
 
   return (
     <div className="p-6 page-enter">
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-6 select-none">
         <Clock className="w-7 h-7 text-primary" />
-        <h1 className="text-3xl font-black">Recently Played</h1>
+        <h1 className="text-3xl font-black">History ({totalCount})</h1>
       </div>
 
-      {isLoading ? (
+      {initialLoading ? (
         <div className="space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="skeleton h-14 rounded-md" />
           ))}
         </div>
-      ) : historyEntries.length === 0 ? (
+      ) : entries.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center select-none">
           <Clock className="w-16 h-16 text-zinc-700 mb-4" />
           <h3 className="text-xl font-bold text-white mb-2">No listening history yet</h3>
@@ -60,22 +106,29 @@ export default function HistoryPage() {
           </Link>
         </div>
       ) : (
-        <div className="space-y-1">
-          {historyEntries.map((entry) => {
-            if (!entry.track) return null;
-            const track = entry.track as Track;
-            return (
-              <div key={entry.id} className="flex items-center gap-2">
-                <div className="flex-1">
-                  <TrackItem track={track} tracks={tracks} />
+        <>
+          <div className="space-y-1">
+            {entries.map((entry) => {
+              if (!entry.track) return null;
+              const track = entry.track as Track;
+              return (
+                <div key={entry.id} className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <TrackItem track={track} tracks={tracks} />
+                  </div>
+                  <span className="text-xs text-muted-foreground w-16 text-right flex-shrink-0">
+                    {formatDate(entry.playedAt)}
+                  </span>
                 </div>
-                <span className="text-xs text-muted-foreground w-16 text-right flex-shrink-0">
-                  {formatDate(entry.playedAt)}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+          <InfiniteScroll
+            onLoadMore={loadMore}
+            hasMore={hasMore}
+            isLoading={isFetchingMore}
+          />
+        </>
       )}
     </div>
   );

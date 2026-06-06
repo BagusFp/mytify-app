@@ -113,7 +113,7 @@ export default function ArtistPage({ params }: ArtistPageProps) {
             <div className="flex items-center justify-center md:justify-start gap-2 text-primary text-xs font-bold uppercase tracking-wider mb-2">
               <Users className="w-3.5 h-3.5" /> Verified Artist
             </div>
-            <h1 className="text-4xl md:text-6xl font-black tracking-tight">{artist.name}</h1>
+            <h1 className="text-4xl md:text-6xl font-serif font-bold tracking-tight">{artist.name}</h1>
             {artist.subscriberCount && (
               <p className="text-muted-foreground mt-2 text-sm">
                 {artist.subscriberCount} subscribers on YouTube
