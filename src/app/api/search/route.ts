@@ -5,7 +5,7 @@ export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams.get('q');
   const limit = parseInt(request.nextUrl.searchParams.get('limit') ?? '20');
   const type = request.nextUrl.searchParams.get('type'); // 'songs' | 'albums' | 'artists' | 'all'
-  const page = parseInt(request.nextUrl.searchParams.get('page') ?? '1');
+  const pageToken = request.nextUrl.searchParams.get('pageToken') ?? undefined;
 
   if (!query || query.trim().length < 2) {
     return NextResponse.json({ error: 'Query must be at least 2 characters' }, { status: 400 });
@@ -14,28 +14,29 @@ export async function GET(request: NextRequest) {
   try {
     const q = query.trim();
     if (type === 'songs') {
-      const fetchCount = page * limit;
-      const allSongs = await searchYouTube(q, fetchCount);
-      const songs = allSongs.slice((page - 1) * limit, page * limit);
-      return NextResponse.json({ songs, hasMore: allSongs.length >= fetchCount });
+      const { songs, nextPageToken } = await searchYouTube(q, limit, pageToken);
+      return NextResponse.json({ songs, nextPageToken });
     } else if (type === 'albums') {
-      const fetchCount = page * limit;
-      const allAlbums = await searchAlbums(q, fetchCount);
-      const albums = allAlbums.slice((page - 1) * limit, page * limit);
-      return NextResponse.json({ albums, hasMore: allAlbums.length >= fetchCount });
+      const { albums, nextPageToken } = await searchAlbums(q, limit, pageToken);
+      return NextResponse.json({ albums, nextPageToken });
     } else if (type === 'artists') {
-      const fetchCount = page * limit;
-      const allArtists = await searchArtists(q, fetchCount);
-      const artists = allArtists.slice((page - 1) * limit, page * limit);
-      return NextResponse.json({ artists, hasMore: allArtists.length >= fetchCount });
+      const { artists, nextPageToken } = await searchArtists(q, limit, pageToken);
+      return NextResponse.json({ artists, nextPageToken });
     } else {
       // Fetch all three concurrently
-      const [songs, albums, artists] = await Promise.all([
-        searchYouTube(q, 15).catch(() => []),
-        searchAlbums(q, 8).catch(() => []),
-        searchArtists(q, 8).catch(() => []),
+      const [youtubeRes, albumsRes, artistsRes] = await Promise.all([
+        searchYouTube(q, 15).catch(() => ({ songs: [], nextPageToken: undefined })),
+        searchAlbums(q, 8).catch(() => ({ albums: [], nextPageToken: undefined })),
+        searchArtists(q, 8).catch(() => ({ artists: [], nextPageToken: undefined })),
       ]);
-      return NextResponse.json({ songs, albums, artists });
+      return NextResponse.json({
+        songs: youtubeRes.songs,
+        albums: albumsRes.albums,
+        artists: artistsRes.artists,
+        nextPageToken: youtubeRes.nextPageToken,
+        albumsNextPageToken: albumsRes.nextPageToken,
+        artistsNextPageToken: artistsRes.nextPageToken,
+      });
     }
   } catch (error) {
     console.error('[Search API]', error);

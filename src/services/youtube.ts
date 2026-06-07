@@ -3,11 +3,15 @@ import { iso8601ToSeconds } from '@/lib/utils';
 
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 
-export async function searchYouTube(query: string, maxResults = 20): Promise<SearchResult[]> {
+export async function searchYouTube(
+  query: string,
+  maxResults = 20,
+  pageToken?: string
+): Promise<{ songs: SearchResult[]; nextPageToken?: string }> {
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
     console.error('YOUTUBE_API_KEY is not defined in environment variables');
-    return [];
+    return { songs: [], nextPageToken: undefined };
   }
 
   try {
@@ -19,6 +23,9 @@ export async function searchYouTube(query: string, maxResults = 20): Promise<Sea
     searchUrl.searchParams.set('videoCategoryId', '10'); // Music category
     searchUrl.searchParams.set('maxResults', String(maxResults));
     searchUrl.searchParams.set('key', apiKey);
+    if (pageToken) {
+      searchUrl.searchParams.set('pageToken', pageToken);
+    }
 
     const searchRes = await fetch(searchUrl.toString(), { next: { revalidate: 60 } });
     if (!searchRes.ok) {
@@ -32,12 +39,13 @@ export async function searchYouTube(query: string, maxResults = 20): Promise<Sea
       throw new Error(message);
     }
     const searchData = await searchRes.json();
+    const nextPageToken = searchData.nextPageToken;
 
     const videoIds: string[] = searchData.items
       ?.map((item: { id: { videoId: string } }) => item.id.videoId)
       .filter(Boolean) ?? [];
 
-    if (videoIds.length === 0) return [];
+    if (videoIds.length === 0) return { songs: [], nextPageToken };
 
     // Step 2: Get video details (duration and snippet details)
     const detailsUrl = new URL(`${YOUTUBE_API_BASE}/videos`);
@@ -72,10 +80,11 @@ export async function searchYouTube(query: string, maxResults = 20): Promise<Sea
         duration: iso8601ToSeconds(item.contentDetails.duration),
       })
     ) ?? [];
-    return results.filter((track: SearchResult) => track.duration > 0);
+    const songs = results.filter((track: SearchResult) => track.duration > 0);
+    return { songs, nextPageToken };
   } catch (e) {
     console.error('[YouTube API searchYouTube failed]', e);
-    return [];
+    return { songs: [], nextPageToken: undefined };
   }
 }
 
@@ -170,11 +179,11 @@ export async function getVideosByIds(videoIds: string[]): Promise<SearchResult[]
 }
 
 // Search for channels (Artists)
-export async function searchArtists(query: string, maxResults = 10): Promise<Artist[]> {
+export async function searchArtists(query: string, maxResults = 10, pageToken?: string): Promise<{ artists: Artist[]; nextPageToken?: string }> {
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
     console.error('YOUTUBE_API_KEY is not defined in environment variables');
-    return [];
+    return { artists: [], nextPageToken: undefined };
   }
 
   try {
@@ -184,6 +193,9 @@ export async function searchArtists(query: string, maxResults = 10): Promise<Art
     url.searchParams.set('type', 'channel');
     url.searchParams.set('maxResults', String(maxResults));
     url.searchParams.set('key', apiKey);
+    if (pageToken) {
+      url.searchParams.set('pageToken', pageToken);
+    }
 
     const res = await fetch(url.toString(), { next: { revalidate: 300 } });
     if (!res.ok) {
@@ -197,8 +209,9 @@ export async function searchArtists(query: string, maxResults = 10): Promise<Art
       throw new Error(message);
     }
     const data = await res.json();
+    const nextPageToken = data.nextPageToken;
 
-    return data.items?.map((item: {
+    const artists = data.items?.map((item: {
       id: { channelId: string };
       snippet: { channelTitle: string; title: string; thumbnails: { medium?: { url: string }; default?: { url: string } }; description: string };
     }) => ({
@@ -207,18 +220,20 @@ export async function searchArtists(query: string, maxResults = 10): Promise<Art
       thumbnail: item.snippet.thumbnails?.medium?.url ?? item.snippet.thumbnails?.default?.url ?? '',
       description: item.snippet.description,
     })) ?? [];
+
+    return { artists, nextPageToken };
   } catch (e) {
     console.error('[YouTube API searchArtists failed]', e);
-    return [];
+    return { artists: [], nextPageToken: undefined };
   }
 }
 
 // Search for playlists (Albums)
-export async function searchAlbums(query: string, maxResults = 10): Promise<Album[]> {
+export async function searchAlbums(query: string, maxResults = 10, pageToken?: string): Promise<{ albums: Album[]; nextPageToken?: string }> {
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
     console.error('YOUTUBE_API_KEY is not defined in environment variables');
-    return [];
+    return { albums: [], nextPageToken: undefined };
   }
 
   try {
@@ -228,6 +243,9 @@ export async function searchAlbums(query: string, maxResults = 10): Promise<Albu
     url.searchParams.set('type', 'playlist');
     url.searchParams.set('maxResults', String(maxResults));
     url.searchParams.set('key', apiKey);
+    if (pageToken) {
+      url.searchParams.set('pageToken', pageToken);
+    }
 
     const res = await fetch(url.toString(), { next: { revalidate: 300 } });
     if (!res.ok) {
@@ -241,8 +259,9 @@ export async function searchAlbums(query: string, maxResults = 10): Promise<Albu
       throw new Error(message);
     }
     const data = await res.json();
+    const nextPageToken = data.nextPageToken;
 
-    return data.items?.map((item: {
+    const albums = data.items?.map((item: {
       id: { playlistId: string };
       snippet: { title: string; thumbnails: { medium?: { url: string }; default?: { url: string } }; channelTitle: string; channelId: string; description: string };
     }) => ({
@@ -253,9 +272,11 @@ export async function searchAlbums(query: string, maxResults = 10): Promise<Albu
       channelId: item.snippet.channelId,
       description: item.snippet.description,
     })) ?? [];
+
+    return { albums, nextPageToken };
   } catch (e) {
     console.error('[YouTube API searchAlbums failed]', e);
-    return [];
+    return { albums: [], nextPageToken: undefined };
   }
 }
 

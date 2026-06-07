@@ -36,15 +36,15 @@ export default function SearchPage() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Pagination states
-  const [songsPage, setSongsPage] = useState(1);
+  const [songsNextPageToken, setSongsNextPageToken] = useState<string | null>(null);
   const [songsHasMore, setSongsHasMore] = useState(true);
   const [isSongsLoadingMore, setIsSongsLoadingMore] = useState(false);
 
-  const [artistsPage, setArtistsPage] = useState(1);
+  const [artistsNextPageToken, setArtistsNextPageToken] = useState<string | null>(null);
   const [artistsHasMore, setArtistsHasMore] = useState(true);
   const [isArtistsLoadingMore, setIsArtistsLoadingMore] = useState(false);
 
-  const [albumsPage, setAlbumsPage] = useState(1);
+  const [albumsNextPageToken, setAlbumsNextPageToken] = useState<string | null>(null);
   const [albumsHasMore, setAlbumsHasMore] = useState(true);
   const [isAlbumsLoadingMore, setIsAlbumsLoadingMore] = useState(false);
 
@@ -60,11 +60,11 @@ export default function SearchPage() {
     setError(null);
 
     // Reset pagination states
-    setSongsPage(1);
+    setSongsNextPageToken(null);
     setSongsHasMore(true);
-    setArtistsPage(1);
+    setArtistsNextPageToken(null);
     setArtistsHasMore(true);
-    setAlbumsPage(1);
+    setAlbumsNextPageToken(null);
     setAlbumsHasMore(true);
 
     try {
@@ -88,6 +88,14 @@ export default function SearchPage() {
       setSongs(tracks);
       setArtists(data.artists || []);
       setAlbums(data.albums || []);
+      
+      setSongsNextPageToken(data.nextPageToken || null);
+      setSongsHasMore(!!data.nextPageToken);
+      setArtistsNextPageToken(data.artistsNextPageToken || null);
+      setArtistsHasMore(!!data.artistsNextPageToken);
+      setAlbumsNextPageToken(data.albumsNextPageToken || null);
+      setAlbumsHasMore(!!data.albumsNextPageToken);
+
       setHasSearched(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Search failed');
@@ -105,12 +113,11 @@ export default function SearchPage() {
   }, [query, doSearch]);
 
   const loadMoreSongs = useCallback(async () => {
-    if (isSongsLoadingMore || !songsHasMore || !query) return;
+    if (isSongsLoadingMore || !songsHasMore || !songsNextPageToken || !query) return;
     setIsSongsLoadingMore(true);
     try {
-      const nextPage = songsPage + 1;
       const res = await fetch(
-        `/api/search?q=${encodeURIComponent(query)}&type=songs&page=${nextPage}&limit=20`
+        `/api/search?q=${encodeURIComponent(query)}&type=songs&pageToken=${encodeURIComponent(songsNextPageToken)}&limit=20`
       );
       if (res.ok) {
         const data = await res.json();
@@ -129,23 +136,22 @@ export default function SearchPage() {
           const filtered = newSongs.filter((s) => !existingIds.has(s.youtubeId));
           return [...prev, ...filtered];
         });
-        setSongsHasMore(data.hasMore);
-        setSongsPage(nextPage);
+        setSongsNextPageToken(data.nextPageToken || null);
+        setSongsHasMore(!!data.nextPageToken);
       }
     } catch (e) {
       console.error(e);
     } finally {
       setIsSongsLoadingMore(false);
     }
-  }, [songsPage, songsHasMore, query, isSongsLoadingMore]);
+  }, [songsNextPageToken, songsHasMore, query, isSongsLoadingMore]);
 
   const loadMoreArtists = useCallback(async () => {
-    if (isArtistsLoadingMore || !artistsHasMore || !query) return;
+    if (isArtistsLoadingMore || !artistsHasMore || !artistsNextPageToken || !query) return;
     setIsArtistsLoadingMore(true);
     try {
-      const nextPage = artistsPage + 1;
       const res = await fetch(
-        `/api/search?q=${encodeURIComponent(query)}&type=artists&page=${nextPage}&limit=20`
+        `/api/search?q=${encodeURIComponent(query)}&type=artists&pageToken=${encodeURIComponent(artistsNextPageToken)}&limit=20`
       );
       if (res.ok) {
         const data = await res.json();
@@ -154,23 +160,22 @@ export default function SearchPage() {
           const filtered = (data.artists || []).filter((a: Artist) => !existingIds.has(a.id));
           return [...prev, ...filtered];
         });
-        setArtistsHasMore(data.hasMore);
-        setArtistsPage(nextPage);
+        setArtistsNextPageToken(data.nextPageToken || null);
+        setArtistsHasMore(!!data.nextPageToken);
       }
     } catch (e) {
       console.error(e);
     } finally {
       setIsArtistsLoadingMore(false);
     }
-  }, [artistsPage, artistsHasMore, query, isArtistsLoadingMore]);
+  }, [artistsNextPageToken, artistsHasMore, query, isArtistsLoadingMore]);
 
   const loadMoreAlbums = useCallback(async () => {
-    if (isAlbumsLoadingMore || !albumsHasMore || !query) return;
+    if (isAlbumsLoadingMore || !albumsHasMore || !albumsNextPageToken || !query) return;
     setIsAlbumsLoadingMore(true);
     try {
-      const nextPage = albumsPage + 1;
       const res = await fetch(
-        `/api/search?q=${encodeURIComponent(query)}&type=albums&page=${nextPage}&limit=20`
+        `/api/search?q=${encodeURIComponent(query)}&type=albums&pageToken=${encodeURIComponent(albumsNextPageToken)}&limit=20`
       );
       if (res.ok) {
         const data = await res.json();
@@ -179,15 +184,15 @@ export default function SearchPage() {
           const filtered = (data.albums || []).filter((a: Album) => !existingIds.has(a.id));
           return [...prev, ...filtered];
         });
-        setAlbumsHasMore(data.hasMore);
-        setAlbumsPage(nextPage);
+        setAlbumsNextPageToken(data.nextPageToken || null);
+        setAlbumsHasMore(!!data.nextPageToken);
       }
     } catch (e) {
       console.error(e);
     } finally {
       setIsAlbumsLoadingMore(false);
     }
-  }, [albumsPage, albumsHasMore, query, isAlbumsLoadingMore]);
+  }, [albumsNextPageToken, albumsHasMore, query, isAlbumsLoadingMore]);
 
   const handleSuggestionClick = (s: string) => {
     setQuery(s);
