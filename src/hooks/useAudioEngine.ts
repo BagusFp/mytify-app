@@ -365,6 +365,13 @@ export function useAudioEngine() {
     if (!streamUrl || !currentTrack) return;
     const audio = getGlobalAudio();
     if (!audio) return;
+    
+    // If the video source is already set to this stream (e.g. loaded synchronously in media session handler), don't reload it
+    if (audio.src === streamUrl) {
+      addToHistory(currentTrack);
+      return;
+    }
+
     audio.src = streamUrl;
     audio.load();
     if (isPlaying) {
@@ -474,10 +481,28 @@ export function useAudioEngine() {
       setIsPlaying(false);
     });
     navigator.mediaSession.setActionHandler('nexttrack', () => {
+      const { queue, playNext } = usePlayerStore.getState();
+      if (queue.length > 0) {
+        const nextTrack = queue[0];
+        const audio = getGlobalAudio();
+        if (audio) {
+          audio.src = nextTrack.youtubeId;
+          audio.play().catch(() => {});
+        }
+      }
       playNext();
     });
     navigator.mediaSession.setActionHandler('previoustrack', () => {
-      usePlayerStore.getState().playPrevious();
+      const { historyQueue, playPrevious } = usePlayerStore.getState();
+      if (historyQueue.length > 0) {
+        const prevTrack = historyQueue[0];
+        const audio = getGlobalAudio();
+        if (audio) {
+          audio.src = prevTrack.youtubeId;
+          audio.play().catch(() => {});
+        }
+      }
+      playPrevious();
     });
     navigator.mediaSession.setActionHandler('seekto', (details) => {
       if (details.seekTime !== undefined) {
@@ -488,7 +513,13 @@ export function useAudioEngine() {
         }
       }
     });
-  }, [currentTrack, setIsPlaying, playNext]);
+  }, [currentTrack, setIsPlaying]);
+
+  // Sync Media Session playbackState
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+  }, [isPlaying]);
 
   // Media Session — keep position state in sync with playback
   useEffect(() => {

@@ -211,8 +211,8 @@ export default function SearchPage() {
       <h1 className="text-3xl font-black mb-6">Search</h1>
 
       {/* Search input */}
-      <div className="relative mb-6 max-w-2xl">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+      <div className="sticky top-[56px] z-20 -mx-6 px-6 py-3 bg-zinc-950/80 backdrop-blur-md md:relative md:top-auto md:z-auto md:mx-0 md:px-0 md:py-0 md:bg-transparent md:backdrop-blur-none mb-6 max-w-2xl">
+        <Search className="absolute left-10 md:left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
         <Input
           id="search-input"
           type="text"
