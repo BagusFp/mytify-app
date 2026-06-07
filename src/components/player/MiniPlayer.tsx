@@ -250,8 +250,8 @@ export function MiniPlayer() {
                 unoptimized
               />
             </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold truncate text-white leading-tight">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold line-clamp-2 text-white leading-tight">
                 {currentTrack.title}
               </p>
               <p className="text-xs text-zinc-400 truncate mt-0.5">

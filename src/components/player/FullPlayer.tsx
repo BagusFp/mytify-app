@@ -423,7 +423,7 @@ export function FullPlayer() {
 
             <div className="flex items-center justify-between w-full max-w-[280px] mx-auto px-1 mt-2">
               <div className="min-w-0 flex-1">
-                <h2 className="text-lg font-black truncate text-white leading-tight">
+                <h2 className="text-lg font-black line-clamp-2 text-white leading-tight">
                   {currentTrack.title}
                 </h2>
                 <p className="text-xs text-zinc-400 truncate mt-1">

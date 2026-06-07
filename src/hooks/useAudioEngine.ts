@@ -160,7 +160,7 @@ class YouTubeAudioWrapper {
     pollingInterval = setInterval(() => {
       this.dispatchEvent('timeupdate');
       this.dispatchEvent('durationchange');
-    }, 200);
+    }, 500);
   }
 
   private stopPolling() {
@@ -449,23 +449,93 @@ export function useAudioEngine() {
     };
   }, [repeat, setPlaybackPosition, setDuration, setIsLoading, setError, setIsPlaying, playNext, setStreamUrl, safePlay]);
 
-  // Media Session API
+  // Media Session API — metadata + action handlers
   useEffect(() => {
     if (!('mediaSession' in navigator) || !currentTrack) return;
+
     navigator.mediaSession.metadata = new MediaMetadata({
       title: currentTrack.title,
       artist: currentTrack.channelName,
       artwork: [
         { src: currentTrack.thumbnail, sizes: '256x256', type: 'image/jpeg' },
+        { src: currentTrack.thumbnail, sizes: '512x512', type: 'image/jpeg' },
       ],
     });
-    navigator.mediaSession.setActionHandler('play', () => setIsPlaying(true));
-    navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false));
-    navigator.mediaSession.setActionHandler('nexttrack', playNext);
-    navigator.mediaSession.setActionHandler('previoustrack', () =>
-      usePlayerStore.getState().playPrevious()
-    );
+
+    // Drive the actual YT player, then sync zustand state
+    navigator.mediaSession.setActionHandler('play', () => {
+      const audio = getGlobalAudio();
+      if (audio) audio.play().catch(() => {});
+      setIsPlaying(true);
+    });
+    navigator.mediaSession.setActionHandler('pause', () => {
+      const audio = getGlobalAudio();
+      if (audio) audio.pause();
+      setIsPlaying(false);
+    });
+    navigator.mediaSession.setActionHandler('nexttrack', () => {
+      playNext();
+    });
+    navigator.mediaSession.setActionHandler('previoustrack', () => {
+      usePlayerStore.getState().playPrevious();
+    });
+    navigator.mediaSession.setActionHandler('seekto', (details) => {
+      if (details.seekTime !== undefined) {
+        const audio = getGlobalAudio();
+        if (audio) {
+          audio.currentTime = details.seekTime;
+          usePlayerStore.getState().setPlaybackPosition(details.seekTime);
+        }
+      }
+    });
   }, [currentTrack, setIsPlaying, playNext]);
+
+  // Media Session — keep position state in sync with playback
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+    const audio = getGlobalAudio();
+    if (!audio) return;
+
+    const updatePositionState = () => {
+      try {
+        const dur = audio.duration;
+        const pos = audio.currentTime;
+        if (dur > 0 && isFinite(dur) && isFinite(pos)) {
+          navigator.mediaSession.setPositionState({
+            duration: dur,
+            playbackRate: 1,
+            position: Math.min(pos, dur),
+          });
+        }
+      } catch { /* ignore — not all browsers support setPositionState */ }
+    };
+
+    audio.addEventListener('timeupdate', updatePositionState);
+    audio.addEventListener('durationchange', updatePositionState);
+    return () => {
+      audio.removeEventListener('timeupdate', updatePositionState);
+      audio.removeEventListener('durationchange', updatePositionState);
+    };
+  }, [currentTrack]);
+
+  // Background playback recovery — visibilitychange
+  // The YouTube IFrame API is throttled by Chromium when the page is hidden
+  // (JS timers are deprioritised and the iframe renderer is suspended).
+  // We cannot fully prevent this without a native app, but we CAN resume
+  // playback the moment the user returns to the tab/app.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const { isPlaying: playing } = usePlayerStore.getState();
+        if (playing) {
+          const audio = getGlobalAudio();
+          if (audio) audio.play().catch(() => {});
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   return {};
 }
