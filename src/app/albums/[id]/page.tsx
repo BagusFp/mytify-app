@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Play, Shuffle, Disc, Users } from 'lucide-react';
+import { ArrowLeft, Play, Shuffle } from 'lucide-react';
 import { usePlayerStore } from '@/stores/playerStore';
 import { Track, Album } from '@/types';
 import { TrackItem } from '@/components/track/TrackItem';

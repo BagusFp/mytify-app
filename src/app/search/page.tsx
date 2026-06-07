@@ -151,7 +151,7 @@ export default function SearchPage() {
         const data = await res.json();
         setArtists((prev) => {
           const existingIds = new Set(prev.map((a) => a.id));
-          const filtered = (data.artists || []).filter((a: any) => !existingIds.has(a.id));
+          const filtered = (data.artists || []).filter((a: Artist) => !existingIds.has(a.id));
           return [...prev, ...filtered];
         });
         setArtistsHasMore(data.hasMore);
@@ -176,7 +176,7 @@ export default function SearchPage() {
         const data = await res.json();
         setAlbums((prev) => {
           const existingIds = new Set(prev.map((a) => a.id));
-          const filtered = (data.albums || []).filter((a: any) => !existingIds.has(a.id));
+          const filtered = (data.albums || []).filter((a: Album) => !existingIds.has(a.id));
           return [...prev, ...filtered];
         });
         setAlbumsHasMore(data.hasMore);

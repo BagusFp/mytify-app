@@ -67,21 +67,8 @@ function SkeletonGrid({ count = 6 }: { count?: number }) {
   );
 }
 
-function SkeletonMobileList() {
-  return (
-    <div className="space-y-2 px-2">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="flex items-center gap-3 p-2 bg-zinc-900/40 border border-zinc-900/60 rounded-lg h-16 animate-pulse">
-          <div className="w-12 h-12 bg-zinc-800 rounded flex-shrink-0" />
-          <div className="flex-1 space-y-2">
-            <div className="h-3 bg-zinc-800 rounded w-3/4" />
-            <div className="h-2.5 bg-zinc-800 rounded w-1/2" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
+
+
 
 function SkeletonHorizontalScroll() {
   return (

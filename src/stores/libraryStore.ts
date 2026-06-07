@@ -41,7 +41,7 @@ interface LibraryStore {
 
 export const useLibraryStore = create<LibraryStore>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       playlists: [],
       isLoading: false,
       favorites: [],

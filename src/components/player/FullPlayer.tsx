@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -26,7 +26,7 @@ export function FullPlayer() {
     toggleShuffle, cycleRepeat, setShowFullPlayer, showFullPlayer, clearQueue
   } = usePlayerStore();
   const { isFavorite, toggleFavorite } = useFavoritesStore();
-  const { showLyrics, toggleLyrics, setShowLyrics } = useLyricsStore();
+  const { showLyrics, setShowLyrics } = useLyricsStore();
   const { seek } = useAudioControls();
 
   // Mobile queue toggle state

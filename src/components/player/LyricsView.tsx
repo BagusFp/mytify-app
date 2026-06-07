@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, startTransition } from 'react';
 import Image from 'next/image';
 import { Music, AlertCircle } from 'lucide-react';
 import { usePlayerStore } from '@/stores/playerStore';
@@ -34,7 +34,7 @@ export function LyricsView({ className }: LyricsViewProps) {
   // Real-time synchronization using requestAnimationFrame directly from the global audio instance
   useEffect(() => {
     if (!synced || synced.length === 0) {
-      setActiveIndex(-1);
+      startTransition(() => setActiveIndex(-1));
       return;
     }
 
@@ -43,6 +43,10 @@ export function LyricsView({ className }: LyricsViewProps) {
     const updateSync = () => {
       try {
         const audio = getGlobalAudio();
+        if (!audio) {
+          animationFrameId = requestAnimationFrame(updateSync);
+          return;
+        }
         const currentTime = audio.currentTime;
 
         let index = -1;
@@ -54,8 +58,8 @@ export function LyricsView({ className }: LyricsViewProps) {
           }
         }
         
-        setActiveIndex(index);
-      } catch (err) {
+        startTransition(() => setActiveIndex(index));
+      } catch {
         // Safe fallback for server-side or unmounted states
       }
 

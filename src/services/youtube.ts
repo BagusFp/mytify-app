@@ -1,75 +1,13 @@
 import { SearchResult, Artist, Album, Track } from '@/types';
 import { iso8601ToSeconds } from '@/lib/utils';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import { existsSync } from 'fs';
 
-const execAsync = promisify(exec);
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
-
-function getDlpExecutable(): string {
-  const customPath = 'C:\\laragon\\bin\\python\\python-3.10\\Scripts\\yt-dlp.exe';
-  if (existsSync(customPath)) {
-    return `"${customPath}"`;
-  }
-  return 'yt-dlp';
-}
-
-// Helper: fallback YouTube search via yt-dlp
-async function searchYouTubeViaDlp(query: string, maxResults = 20): Promise<SearchResult[]> {
-  const ytDlpCmd = getDlpExecutable();
-  const cmd = `${ytDlpCmd} --flat-playlist --playlist-end ${maxResults} --dump-single-json "ytsearch${maxResults}:${query.replace(/"/g, '\\"')}"`;
-  try {
-    const { stdout } = await execAsync(cmd, { timeout: 30000 });
-    const data = JSON.parse(stdout);
-    if (!data.entries) return [];
-    return data.entries
-      .filter((entry: any) => entry.duration && entry.duration > 0 && !entry.is_live)
-      .map((entry: any) => {
-        const thumbnail = entry.thumbnails?.[entry.thumbnails.length - 1]?.url || 
-                          `https://i.ytimg.com/vi/${entry.id}/mqdefault.jpg`;
-        return {
-          youtubeId: entry.id,
-          title: entry.title,
-          thumbnail,
-          channelName: entry.channel || entry.uploader || 'Unknown Artist',
-          channelId: entry.channel_id || null,
-          duration: Math.round(entry.duration || 0),
-        };
-      });
-  } catch (error) {
-    console.error('[yt-dlp Search Fallback Failed]', error);
-    return [];
-  }
-}
-
-// Helper: fallback video details via yt-dlp
-async function getVideoDetailsViaDlp(videoId: string): Promise<SearchResult | null> {
-  const ytDlpCmd = getDlpExecutable();
-  const cmd = `${ytDlpCmd} --dump-single-json "https://www.youtube.com/watch?v=${videoId}"`;
-  try {
-    const { stdout } = await execAsync(cmd, { timeout: 30000 });
-    const data = JSON.parse(stdout);
-    const thumbnail = data.thumbnails?.[data.thumbnails.length - 1]?.url || 
-                      `https://i.ytimg.com/vi/${data.id}/mqdefault.jpg`;
-    return {
-      youtubeId: data.id,
-      title: data.title,
-      thumbnail,
-      channelName: data.channel || data.uploader || 'Unknown Artist',
-      channelId: data.channel_id || null,
-      duration: Math.round(data.duration || 0),
-    };
-  } catch (error) {
-    console.error('[yt-dlp Details Fallback Failed]', error);
-    return null;
-  }
-}
 
 export async function searchYouTube(query: string, maxResults = 20): Promise<SearchResult[]> {
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
-    return searchYouTubeViaDlp(query, maxResults);
+    console.error('YOUTUBE_API_KEY is not defined in environment variables');
+    return [];
   }
 
   try {
@@ -84,8 +22,14 @@ export async function searchYouTube(query: string, maxResults = 20): Promise<Sea
 
     const searchRes = await fetch(searchUrl.toString(), { next: { revalidate: 60 } });
     if (!searchRes.ok) {
-      const err = await searchRes.json();
-      throw new Error(err?.error?.message ?? 'YouTube search failed');
+      let message = 'YouTube search failed';
+      try {
+        const err = await searchRes.json();
+        message = err?.error?.message ?? message;
+      } catch {
+        message = `YouTube search failed with status ${searchRes.status}`;
+      }
+      throw new Error(message);
     }
     const searchData = await searchRes.json();
 
@@ -102,7 +46,16 @@ export async function searchYouTube(query: string, maxResults = 20): Promise<Sea
     detailsUrl.searchParams.set('key', apiKey);
 
     const detailsRes = await fetch(detailsUrl.toString(), { next: { revalidate: 60 } });
-    if (!detailsRes.ok) throw new Error('YouTube video details fetch failed');
+    if (!detailsRes.ok) {
+      let message = 'YouTube video details fetch failed';
+      try {
+        const err = await detailsRes.json();
+        message = err?.error?.message ?? message;
+      } catch {
+        message = `YouTube video details fetch failed with status ${detailsRes.status}`;
+      }
+      throw new Error(message);
+    }
     const detailsData = await detailsRes.json();
 
     const results = detailsData.items?.map(
@@ -119,17 +72,18 @@ export async function searchYouTube(query: string, maxResults = 20): Promise<Sea
         duration: iso8601ToSeconds(item.contentDetails.duration),
       })
     ) ?? [];
-    return results.filter((track: any) => track.duration > 0);
+    return results.filter((track: SearchResult) => track.duration > 0);
   } catch (e) {
-    console.warn('[YouTube API failed, falling back to yt-dlp search]', e);
-    return searchYouTubeViaDlp(query, maxResults);
+    console.error('[YouTube API searchYouTube failed]', e);
+    return [];
   }
 }
 
 export async function getVideoDetails(videoId: string): Promise<SearchResult | null> {
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
-    return getVideoDetailsViaDlp(videoId);
+    console.error('YOUTUBE_API_KEY is not defined in environment variables');
+    return null;
   }
 
   try {
@@ -139,11 +93,20 @@ export async function getVideoDetails(videoId: string): Promise<SearchResult | n
     url.searchParams.set('key', apiKey);
 
     const res = await fetch(url.toString(), { next: { revalidate: 300 } });
-    if (!res.ok) return getVideoDetailsViaDlp(videoId);
+    if (!res.ok) {
+      let message = 'YouTube video details fetch failed';
+      try {
+        const err = await res.json();
+        message = err?.error?.message ?? message;
+      } catch {
+        message = `YouTube video details fetch failed with status ${res.status}`;
+      }
+      throw new Error(message);
+    }
     const data = await res.json();
 
     const item = data.items?.[0];
-    if (!item) return getVideoDetailsViaDlp(videoId);
+    if (!item) return null;
 
     return {
       youtubeId: item.id,
@@ -154,8 +117,8 @@ export async function getVideoDetails(videoId: string): Promise<SearchResult | n
       duration: iso8601ToSeconds(item.contentDetails.duration),
     };
   } catch (e) {
-    console.warn('[YouTube API failed, falling back to yt-dlp details]', e);
-    return getVideoDetailsViaDlp(videoId);
+    console.error('[YouTube API getVideoDetails failed]', e);
+    return null;
   }
 }
 
@@ -163,8 +126,8 @@ export async function getVideosByIds(videoIds: string[]): Promise<SearchResult[]
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (videoIds.length === 0) return [];
   if (!apiKey) {
-    const results = await Promise.all(videoIds.map((id) => getVideoDetailsViaDlp(id)));
-    return results.filter(Boolean) as SearchResult[];
+    console.error('YOUTUBE_API_KEY is not defined in environment variables');
+    return [];
   }
 
   try {
@@ -175,8 +138,14 @@ export async function getVideosByIds(videoIds: string[]): Promise<SearchResult[]
 
     const res = await fetch(url.toString(), { next: { revalidate: 300 } });
     if (!res.ok) {
-      const results = await Promise.all(videoIds.map((id) => getVideoDetailsViaDlp(id)));
-      return results.filter(Boolean) as SearchResult[];
+      let message = 'YouTube videos by IDs fetch failed';
+      try {
+        const err = await res.json();
+        message = err?.error?.message ?? message;
+      } catch {
+        message = `YouTube videos by IDs fetch failed with status ${res.status}`;
+      }
+      throw new Error(message);
     }
     const data = await res.json();
 
@@ -195,9 +164,8 @@ export async function getVideosByIds(videoIds: string[]): Promise<SearchResult[]
       })
     ) ?? [];
   } catch (e) {
-    console.warn('[YouTube API failed, falling back to yt-dlp details batch]', e);
-    const results = await Promise.all(videoIds.map((id) => getVideoDetailsViaDlp(id)));
-    return results.filter(Boolean) as SearchResult[];
+    console.error('[YouTube API getVideosByIds failed]', e);
+    return [];
   }
 }
 
@@ -205,19 +173,8 @@ export async function getVideosByIds(videoIds: string[]): Promise<SearchResult[]
 export async function searchArtists(query: string, maxResults = 10): Promise<Artist[]> {
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
-    const videos = await searchYouTubeViaDlp(query, maxResults);
-    const artistsMap = new Map<string, Artist>();
-    for (const v of videos) {
-      if (v.channelId && !artistsMap.has(v.channelId)) {
-        artistsMap.set(v.channelId, {
-          id: v.channelId,
-          name: v.channelName,
-          thumbnail: `https://i.ytimg.com/vi/${v.youtubeId}/mqdefault.jpg`,
-          description: `Uploader: ${v.channelName}`,
-        });
-      }
-    }
-    return Array.from(artistsMap.values());
+    console.error('YOUTUBE_API_KEY is not defined in environment variables');
+    return [];
   }
 
   try {
@@ -229,30 +186,30 @@ export async function searchArtists(query: string, maxResults = 10): Promise<Art
     url.searchParams.set('key', apiKey);
 
     const res = await fetch(url.toString(), { next: { revalidate: 300 } });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      let message = 'YouTube artists search failed';
+      try {
+        const err = await res.json();
+        message = err?.error?.message ?? message;
+      } catch {
+        message = `YouTube artists search failed with status ${res.status}`;
+      }
+      throw new Error(message);
+    }
     const data = await res.json();
 
-    return data.items?.map((item: any) => ({
+    return data.items?.map((item: {
+      id: { channelId: string };
+      snippet: { channelTitle: string; title: string; thumbnails: { medium?: { url: string }; default?: { url: string } }; description: string };
+    }) => ({
       id: item.id.channelId,
       name: item.snippet.channelTitle || item.snippet.title,
       thumbnail: item.snippet.thumbnails?.medium?.url ?? item.snippet.thumbnails?.default?.url ?? '',
       description: item.snippet.description,
     })) ?? [];
   } catch (e) {
-    console.warn('[YouTube API failed, falling back to yt-dlp uploader extraction for artists]', e);
-    const videos = await searchYouTubeViaDlp(query, maxResults);
-    const artistsMap = new Map<string, Artist>();
-    for (const v of videos) {
-      if (v.channelId && !artistsMap.has(v.channelId)) {
-        artistsMap.set(v.channelId, {
-          id: v.channelId,
-          name: v.channelName,
-          thumbnail: `https://i.ytimg.com/vi/${v.youtubeId}/mqdefault.jpg`,
-          description: `Uploader: ${v.channelName}`,
-        });
-      }
-    }
-    return Array.from(artistsMap.values());
+    console.error('[YouTube API searchArtists failed]', e);
+    return [];
   }
 }
 
@@ -260,16 +217,8 @@ export async function searchArtists(query: string, maxResults = 10): Promise<Art
 export async function searchAlbums(query: string, maxResults = 10): Promise<Album[]> {
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
-    // Search videos and create album representations
-    const videos = await searchYouTubeViaDlp(query + ' album', maxResults);
-    return videos.map((v) => ({
-      id: `playlist-${v.youtubeId}`,
-      title: `${v.channelName} Collection`,
-      thumbnail: v.thumbnail,
-      channelName: v.channelName,
-      channelId: v.channelId,
-      description: `Album fallback representation for uploader ${v.channelName}`,
-    }));
+    console.error('YOUTUBE_API_KEY is not defined in environment variables');
+    return [];
   }
 
   try {
@@ -281,10 +230,22 @@ export async function searchAlbums(query: string, maxResults = 10): Promise<Albu
     url.searchParams.set('key', apiKey);
 
     const res = await fetch(url.toString(), { next: { revalidate: 300 } });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      let message = 'YouTube albums search failed';
+      try {
+        const err = await res.json();
+        message = err?.error?.message ?? message;
+      } catch {
+        message = `YouTube albums search failed with status ${res.status}`;
+      }
+      throw new Error(message);
+    }
     const data = await res.json();
 
-    return data.items?.map((item: any) => ({
+    return data.items?.map((item: {
+      id: { playlistId: string };
+      snippet: { title: string; thumbnails: { medium?: { url: string }; default?: { url: string } }; channelTitle: string; channelId: string; description: string };
+    }) => ({
       id: item.id.playlistId,
       title: item.snippet.title,
       thumbnail: item.snippet.thumbnails?.medium?.url ?? item.snippet.thumbnails?.default?.url ?? '',
@@ -293,16 +254,8 @@ export async function searchAlbums(query: string, maxResults = 10): Promise<Albu
       description: item.snippet.description,
     })) ?? [];
   } catch (e) {
-    console.warn('[YouTube API failed, falling back to album mock generation]', e);
-    const videos = await searchYouTubeViaDlp(query + ' album', maxResults);
-    return videos.map((v) => ({
-      id: `playlist-${v.youtubeId}`,
-      title: `${v.channelName} Collection`,
-      thumbnail: v.thumbnail,
-      channelName: v.channelName,
-      channelId: v.channelId,
-      description: `Album fallback representation for uploader ${v.channelName}`,
-    }));
+    console.error('[YouTube API searchAlbums failed]', e);
+    return [];
   }
 }
 
@@ -310,26 +263,8 @@ export async function searchAlbums(query: string, maxResults = 10): Promise<Albu
 export async function getChannelDetails(channelId: string): Promise<Artist | null> {
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
-    const ytDlpCmd = getDlpExecutable();
-    const cmd = `${ytDlpCmd} --flat-playlist --dump-single-json "https://www.youtube.com/channel/${channelId}"`;
-    try {
-      const { stdout } = await execAsync(cmd, { timeout: 30000 });
-      const data = JSON.parse(stdout);
-      const thumbnail = data.thumbnails?.[data.thumbnails.length - 1]?.url || '';
-      return {
-        id: data.id || channelId,
-        name: data.title || 'Unknown Artist',
-        thumbnail,
-        description: data.description || `Uploader channel ${data.title}`,
-      };
-    } catch {
-      return {
-        id: channelId,
-        name: 'YouTube Creator',
-        thumbnail: '',
-        description: 'Artist details retrieved via uploader fallback.',
-      };
-    }
+    console.error('YOUTUBE_API_KEY is not defined in environment variables');
+    return null;
   }
 
   try {
@@ -339,7 +274,16 @@ export async function getChannelDetails(channelId: string): Promise<Artist | nul
     url.searchParams.set('key', apiKey);
 
     const res = await fetch(url.toString(), { next: { revalidate: 300 } });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      let message = 'YouTube channel details fetch failed';
+      try {
+        const err = await res.json();
+        message = err?.error?.message ?? message;
+      } catch {
+        message = `YouTube channel details fetch failed with status ${res.status}`;
+      }
+      throw new Error(message);
+    }
     const data = await res.json();
 
     const item = data.items?.[0];
@@ -355,55 +299,18 @@ export async function getChannelDetails(channelId: string): Promise<Artist | nul
         : undefined,
     };
   } catch (e) {
-    console.warn('[YouTube API failed, falling back to channel details scraping]', e);
-    const ytDlpCmd = getDlpExecutable();
-    const cmd = `${ytDlpCmd} --flat-playlist --dump-single-json "https://www.youtube.com/channel/${channelId}"`;
-    try {
-      const { stdout } = await execAsync(cmd, { timeout: 30000 });
-      const data = JSON.parse(stdout);
-      const thumbnail = data.thumbnails?.[data.thumbnails.length - 1]?.url || '';
-      return {
-        id: data.id || channelId,
-        name: data.title || 'Unknown Artist',
-        thumbnail,
-        description: data.description || `Uploader channel ${data.title}`,
-      };
-    } catch {
-      return {
-        id: channelId,
-        name: 'YouTube Creator',
-        thumbnail: '',
-        description: 'Artist details retrieved via uploader fallback.',
-      };
-    }
+    console.error('[YouTube API getChannelDetails failed]', e);
+    return null;
   }
 }
 
 // Get videos for a channel (Artist top tracks)
 export async function getChannelTracks(channelId: string, maxResults = 10): Promise<Track[]> {
   const apiKey = process.env.YOUTUBE_API_KEY;
-  const ytDlpCmd = getDlpExecutable();
-  const fallbackFn = async () => {
-    const cmdChannel = `${ytDlpCmd} --flat-playlist --playlist-end ${maxResults} --dump-single-json "https://www.youtube.com/channel/${channelId}"`;
-    try {
-      const { stdout } = await execAsync(cmdChannel, { timeout: 30000 });
-      const data = JSON.parse(stdout);
-      if (!data.entries) return [];
-      return data.entries.map((entry: any) => ({
-        id: entry.id,
-        youtubeId: entry.id,
-        title: entry.title,
-        thumbnail: entry.thumbnails?.[entry.thumbnails.length - 1]?.url || `https://i.ytimg.com/vi/${entry.id}/mqdefault.jpg`,
-        duration: Math.round(entry.duration || 0),
-        channelName: data.title || entry.uploader || 'Unknown Channel',
-        channelId: channelId,
-      }));
-    } catch {
-      return [];
-    }
-  };
-
-  if (!apiKey) return fallbackFn();
+  if (!apiKey) {
+    console.error('YOUTUBE_API_KEY is not defined in environment variables');
+    return [];
+  }
 
   try {
     const url = new URL(`${YOUTUBE_API_BASE}/search`);
@@ -416,11 +323,20 @@ export async function getChannelTracks(channelId: string, maxResults = 10): Prom
     url.searchParams.set('key', apiKey);
 
     const res = await fetch(url.toString(), { next: { revalidate: 300 } });
-    if (!res.ok) return fallbackFn();
+    if (!res.ok) {
+      let message = 'YouTube channel tracks fetch failed';
+      try {
+        const err = await res.json();
+        message = err?.error?.message ?? message;
+      } catch {
+        message = `YouTube channel tracks fetch failed with status ${res.status}`;
+      }
+      throw new Error(message);
+    }
     const data = await res.json();
 
-    const videoIds = data.items?.map((item: any) => item.id.videoId).filter(Boolean) ?? [];
-    if (videoIds.length === 0) return fallbackFn();
+    const videoIds = data.items?.map((item: { id: { videoId: string } }) => item.id.videoId).filter(Boolean) ?? [];
+    if (videoIds.length === 0) return [];
 
     const details = await getVideosByIds(videoIds);
     return details.map((d) => ({
@@ -433,8 +349,8 @@ export async function getChannelTracks(channelId: string, maxResults = 10): Prom
       channelId: d.channelId,
     }));
   } catch (e) {
-    console.warn('[YouTube API failed, falling back to channel tracks scraping]', e);
-    return fallbackFn();
+    console.error('[YouTube API getChannelTracks failed]', e);
+    return [];
   }
 }
 
@@ -451,10 +367,23 @@ export async function getChannelPlaylists(channelId: string, maxResults = 10): P
     url.searchParams.set('key', apiKey);
 
     const res = await fetch(url.toString(), { next: { revalidate: 300 } });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      let message = 'YouTube channel playlists fetch failed';
+      try {
+        const err = await res.json();
+        message = err?.error?.message ?? message;
+      } catch {
+        message = `YouTube channel playlists fetch failed with status ${res.status}`;
+      }
+      throw new Error(message);
+    }
     const data = await res.json();
 
-    return data.items?.map((item: any) => ({
+    return data.items?.map((item: {
+      id: string;
+      snippet: { title: string; thumbnails: { medium?: { url: string }; default?: { url: string } }; channelTitle: string; channelId: string; description: string };
+      contentDetails?: { itemCount?: number };
+    }) => ({
       id: item.id,
       title: item.snippet.title,
       thumbnail: item.snippet.thumbnails?.medium?.url ?? item.snippet.thumbnails?.default?.url ?? '',
@@ -464,7 +393,7 @@ export async function getChannelPlaylists(channelId: string, maxResults = 10): P
       trackCount: item.contentDetails?.itemCount,
     })) ?? [];
   } catch (e) {
-    console.warn('[YouTube API failed, return empty playlists]', e);
+    console.error('[YouTube API getChannelPlaylists failed]', e);
     return [];
   }
 }
@@ -472,28 +401,10 @@ export async function getChannelPlaylists(channelId: string, maxResults = 10): P
 // Get specific playlist details
 export async function getPlaylistDetails(playlistId: string): Promise<Album | null> {
   const apiKey = process.env.YOUTUBE_API_KEY;
-  const ytDlpCmd = getDlpExecutable();
-  const fallbackFn = async () => {
-    const cmd = `${ytDlpCmd} --flat-playlist --dump-single-json "https://www.youtube.com/playlist?list=${playlistId}"`;
-    try {
-      const { stdout } = await execAsync(cmd, { timeout: 30000 });
-      const data = JSON.parse(stdout);
-      const thumbnail = data.thumbnails?.[data.thumbnails.length - 1]?.url || '';
-      return {
-        id: data.id,
-        title: data.title,
-        thumbnail,
-        channelName: data.uploader || 'Unknown Channel',
-        channelId: data.uploader_id || null,
-        description: data.description || '',
-        trackCount: data.playlist_count || data.entries?.length || 0,
-      };
-    } catch {
-      return null;
-    }
-  };
-
-  if (!apiKey) return fallbackFn();
+  if (!apiKey) {
+    console.error('YOUTUBE_API_KEY is not defined in environment variables');
+    return null;
+  }
 
   try {
     const url = new URL(`${YOUTUBE_API_BASE}/playlists`);
@@ -502,11 +413,20 @@ export async function getPlaylistDetails(playlistId: string): Promise<Album | nu
     url.searchParams.set('key', apiKey);
 
     const res = await fetch(url.toString(), { next: { revalidate: 300 } });
-    if (!res.ok) return fallbackFn();
+    if (!res.ok) {
+      let message = 'YouTube playlist details fetch failed';
+      try {
+        const err = await res.json();
+        message = err?.error?.message ?? message;
+      } catch {
+        message = `YouTube playlist details fetch failed with status ${res.status}`;
+      }
+      throw new Error(message);
+    }
     const data = await res.json();
 
     const item = data.items?.[0];
-    if (!item) return fallbackFn();
+    if (!item) return null;
 
     return {
       id: item.id,
@@ -518,36 +438,18 @@ export async function getPlaylistDetails(playlistId: string): Promise<Album | nu
       trackCount: item.contentDetails?.itemCount,
     };
   } catch (e) {
-    console.warn('[YouTube API failed, falling back to playlist details scraping]', e);
-    return fallbackFn();
+    console.error('[YouTube API getPlaylistDetails failed]', e);
+    return null;
   }
 }
 
 // Get tracks for a playlist (Album tracks)
 export async function getPlaylistTracks(playlistId: string): Promise<Track[]> {
   const apiKey = process.env.YOUTUBE_API_KEY;
-  const ytDlpCmd = getDlpExecutable();
-  const fallbackFn = async () => {
-    const cmd = `${ytDlpCmd} --flat-playlist --dump-single-json "https://www.youtube.com/playlist?list=${playlistId}"`;
-    try {
-      const { stdout } = await execAsync(cmd, { timeout: 30000 });
-      const data = JSON.parse(stdout);
-      if (!data.entries) return [];
-      return data.entries.map((entry: any) => ({
-        id: entry.id,
-        youtubeId: entry.id,
-        title: entry.title,
-        thumbnail: entry.thumbnails?.[entry.thumbnails.length - 1]?.url || `https://i.ytimg.com/vi/${entry.id}/mqdefault.jpg`,
-        duration: Math.round(entry.duration || 0),
-        channelName: entry.channel || entry.uploader || 'Unknown Channel',
-        channelId: entry.channel_id || null,
-      }));
-    } catch {
-      return [];
-    }
-  };
-
-  if (!apiKey) return fallbackFn();
+  if (!apiKey) {
+    console.error('YOUTUBE_API_KEY is not defined in environment variables');
+    return [];
+  }
 
   try {
     const url = new URL(`${YOUTUBE_API_BASE}/playlistItems`);
@@ -557,11 +459,20 @@ export async function getPlaylistTracks(playlistId: string): Promise<Track[]> {
     url.searchParams.set('key', apiKey);
 
     const res = await fetch(url.toString(), { next: { revalidate: 300 } });
-    if (!res.ok) return fallbackFn();
+    if (!res.ok) {
+      let message = 'YouTube playlist tracks fetch failed';
+      try {
+        const err = await res.json();
+        message = err?.error?.message ?? message;
+      } catch {
+        message = `YouTube playlist tracks fetch failed with status ${res.status}`;
+      }
+      throw new Error(message);
+    }
     const data = await res.json();
 
-    const videoIds = data.items?.map((item: any) => item.contentDetails?.videoId).filter(Boolean) ?? [];
-    if (videoIds.length === 0) return fallbackFn();
+    const videoIds = data.items?.map((item: { contentDetails?: { videoId?: string } }) => item.contentDetails?.videoId).filter(Boolean) ?? [];
+    if (videoIds.length === 0) return [];
 
     const details = await getVideosByIds(videoIds);
     return details.map((d) => ({
@@ -574,7 +485,8 @@ export async function getPlaylistTracks(playlistId: string): Promise<Track[]> {
       channelId: d.channelId,
     }));
   } catch (e) {
-    console.warn('[YouTube API failed, falling back to playlist tracks scraping]', e);
-    return fallbackFn();
+    console.error('[YouTube API getPlaylistTracks failed]', e);
+    return [];
   }
 }
+
