@@ -244,7 +244,7 @@ export default function HomePage() {
                     <Image src={track.thumbnail} alt={track.title} fill className="object-cover" unoptimized />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold truncate text-white leading-tight">{track.title}</p>
+                    <p className="text-sm font-semibold line-clamp-2 md:line-clamp-none md:truncate text-white leading-tight">{track.title}</p>
                     <p className="text-[11px] text-zinc-400 truncate mt-1">{track.channelName}</p>
                   </div>
                   <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-300 flex-shrink-0 active:scale-90 transition-transform">

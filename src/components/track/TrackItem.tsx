@@ -98,7 +98,7 @@ export function TrackItem({ track, index, tracks = [], showIndex = false, classN
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <p className={cn('text-sm font-medium truncate leading-tight', isCurrentTrack && 'text-primary')}>
+        <p className={cn('text-sm font-medium line-clamp-2 md:line-clamp-none md:truncate leading-tight', isCurrentTrack && 'text-primary')}>
           {track.title}
         </p>
         <p className="text-xs text-muted-foreground truncate mt-0.5">
