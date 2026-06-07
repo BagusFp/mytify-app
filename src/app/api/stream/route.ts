@@ -35,21 +35,33 @@ async function getStreamUrl(videoId: string): Promise<string> {
     `https://www.youtube.com/watch?v=${videoId}`,
   ].join(' ');
 
-  const { stdout, stderr } = await execAsync(ytDlpArgs, { timeout: 30000 });
+  try {
+    const { stdout, stderr } = await execAsync(ytDlpArgs, { timeout: 30000 });
 
-  if (stderr && !stdout) {
-    throw new Error(`yt-dlp error: ${stderr}`);
+    if (stderr && !stdout) {
+      if (stderr.includes('Requested format is not available')) {
+        throw new Error('Live streams are not supported for playback');
+      }
+      throw new Error(`yt-dlp error: ${stderr}`);
+    }
+
+    const url = stdout.trim().split('\n')[0];
+    if (!url || !url.startsWith('http')) {
+      throw new Error('yt-dlp returned invalid URL');
+    }
+
+    // Cache the result
+    streamCache.set(videoId, { url, expiresAt: Date.now() + CACHE_TTL });
+
+    return url;
+  } catch (error: any) {
+    const errMsg = error.message || '';
+    const errStd = error.stderr || '';
+    if (errMsg.includes('Requested format is not available') || errStd.includes('Requested format is not available')) {
+      throw new Error('Live streams are not supported for playback');
+    }
+    throw error;
   }
-
-  const url = stdout.trim().split('\n')[0];
-  if (!url || !url.startsWith('http')) {
-    throw new Error('yt-dlp returned invalid URL');
-  }
-
-  // Cache the result
-  streamCache.set(videoId, { url, expiresAt: Date.now() + CACHE_TTL });
-
-  return url;
 }
 
 export async function GET(request: NextRequest) {

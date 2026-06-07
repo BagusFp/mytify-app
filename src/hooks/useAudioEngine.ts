@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { usePlayerStore } from '@/stores/playerStore';
-import { useLibraryStore } from '@/stores/libraryStore';
+import { useHistoryStore } from '@/stores/historyStore';
 import { Track } from '@/types';
 
 /**
@@ -36,7 +36,7 @@ export function useAudioEngine() {
     playNext,
   } = usePlayerStore();
 
-  const { addToHistory } = useLibraryStore();
+  const { addToHistory } = useHistoryStore();
   const isLoadingStreamRef = useRef(false);
   const currentTrackRef = useRef<Track | null>(null);
   const playPromiseRef = useRef<Promise<void> | null>(null);

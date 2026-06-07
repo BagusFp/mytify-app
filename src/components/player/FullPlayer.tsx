@@ -318,7 +318,7 @@ export function FullPlayer() {
       {/* MOBILE FULLSCREEN PLAYER */}
       <div
         className={cn(
-          'md:hidden fixed inset-0 bg-gradient-to-b from-zinc-900 via-zinc-950 to-black flex flex-col justify-between p-6 z-[60] transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
+          'md:hidden fixed inset-0 bg-gradient-to-b from-zinc-900 via-zinc-950 to-black flex flex-col justify-between p-6 pb-[calc(24px+env(safe-area-inset-bottom,0px))] z-[60] transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
           showFullPlayer ? 'translate-y-0' : 'translate-y-full'
         )}
         style={{
@@ -373,7 +373,7 @@ export function FullPlayer() {
           </div>
         ) : showMobileQueue ? (
           // Mobile Queue View
-          <div className="flex-1 flex flex-col h-0 my-4 bg-black/20 rounded-2xl border border-zinc-900">
+          <div className="flex-1 flex flex-col h-0 my-4 bg-black/20 rounded-2xl border border-zinc-900 overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-900 flex-shrink-0">
               <h3 className="text-sm font-bold text-white">Next Up ({upcomingQueue.length})</h3>
               {upcomingQueue.length > 0 && (
@@ -387,7 +387,7 @@ export function FullPlayer() {
                 </Button>
               )}
             </div>
-            <ScrollArea className="flex-1">
+            <ScrollArea className="flex-1 min-h-0">
               <div className="p-3 space-y-1">
                 {upcomingQueue.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 text-center text-zinc-500 text-xs">

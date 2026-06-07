@@ -23,18 +23,20 @@ async function searchYouTubeViaDlp(query: string, maxResults = 20): Promise<Sear
     const { stdout } = await execAsync(cmd, { timeout: 30000 });
     const data = JSON.parse(stdout);
     if (!data.entries) return [];
-    return data.entries.map((entry: any) => {
-      const thumbnail = entry.thumbnails?.[entry.thumbnails.length - 1]?.url || 
-                        `https://i.ytimg.com/vi/${entry.id}/mqdefault.jpg`;
-      return {
-        youtubeId: entry.id,
-        title: entry.title,
-        thumbnail,
-        channelName: entry.channel || entry.uploader || 'Unknown Artist',
-        channelId: entry.channel_id || null,
-        duration: Math.round(entry.duration || 0),
-      };
-    });
+    return data.entries
+      .filter((entry: any) => entry.duration && entry.duration > 0 && !entry.is_live)
+      .map((entry: any) => {
+        const thumbnail = entry.thumbnails?.[entry.thumbnails.length - 1]?.url || 
+                          `https://i.ytimg.com/vi/${entry.id}/mqdefault.jpg`;
+        return {
+          youtubeId: entry.id,
+          title: entry.title,
+          thumbnail,
+          channelName: entry.channel || entry.uploader || 'Unknown Artist',
+          channelId: entry.channel_id || null,
+          duration: Math.round(entry.duration || 0),
+        };
+      });
   } catch (error) {
     console.error('[yt-dlp Search Fallback Failed]', error);
     return [];
@@ -103,7 +105,7 @@ export async function searchYouTube(query: string, maxResults = 20): Promise<Sea
     if (!detailsRes.ok) throw new Error('YouTube video details fetch failed');
     const detailsData = await detailsRes.json();
 
-    return detailsData.items?.map(
+    const results = detailsData.items?.map(
       (item: {
         id: string;
         snippet: { title: string; thumbnails: { medium: { url: string } }; channelTitle: string; channelId: string };
@@ -117,6 +119,7 @@ export async function searchYouTube(query: string, maxResults = 20): Promise<Sea
         duration: iso8601ToSeconds(item.contentDetails.duration),
       })
     ) ?? [];
+    return results.filter((track: any) => track.duration > 0);
   } catch (e) {
     console.warn('[YouTube API failed, falling back to yt-dlp search]', e);
     return searchYouTubeViaDlp(query, maxResults);

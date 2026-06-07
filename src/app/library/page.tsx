@@ -3,15 +3,14 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ListMusic, Plus, Trash2, Pencil, ChevronRight } from 'lucide-react';
-import { useLibraryStore } from '@/stores/libraryStore';
-import { Playlist } from '@/types';
+import { useLibraryStore, LocalPlaylist } from '@/stores/libraryStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 
 function PlaylistCard({ playlist, onDelete, onRename }: {
-  playlist: Playlist;
+  playlist: LocalPlaylist;
   onDelete: (id: string) => void;
   onRename: (id: string, name: string) => void;
 }) {

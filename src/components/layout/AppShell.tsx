@@ -18,14 +18,13 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   useAudioEngine(); // Run the global audio engine singleton
 
-  const { fetchPlaylists, fetchFavorites } = useLibraryStore();
+  const { fetchPlaylists } = useLibraryStore();
   const { currentTrack } = usePlayerStore();
 
-  // Load library data on mount
+  // Load library data on mount (no-op: localStorage loads automatically via persist)
   useEffect(() => {
     fetchPlaylists();
-    fetchFavorites();
-  }, [fetchPlaylists, fetchFavorites]);
+  }, [fetchPlaylists]);
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -36,7 +35,7 @@ export function AppShell({ children }: AppShellProps) {
       <main
         className={cn(
           'flex-1 overflow-x-hidden min-h-screen flex flex-col',
-          currentTrack ? 'pb-[130px] md:pb-24' : 'pb-14 md:pb-0'
+          currentTrack ? 'main-content-padding-player' : 'main-content-padding'
         )}
       >
         <PageHeader />

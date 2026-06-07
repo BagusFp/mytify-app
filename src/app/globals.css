@@ -259,3 +259,24 @@
 .player-safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0);
 }
+
+/* === Main content padding (mobile layout fixes) === */
+.main-content-padding {
+  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 768px) {
+  .main-content-padding {
+    padding-bottom: 0px;
+  }
+}
+
+.main-content-padding-player {
+  padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 768px) {
+  .main-content-padding-player {
+    padding-bottom: 96px;
+  }
+}

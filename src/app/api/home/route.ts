@@ -1,40 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getVideosByIds } from '@/services/youtube';
-import { FEATURED_VIDEO_IDS, DEFAULT_USER_ID } from '@/lib/constants';
-import { prisma, ensureDefaultUser } from '@/lib/prisma';
+import { FEATURED_VIDEO_IDS } from '@/lib/constants';
 import { SearchResult } from '@/types';
 
 export async function GET() {
   try {
-    await ensureDefaultUser();
-    // Recently played from DB
-    const recentHistory = await prisma.history.findMany({
-      where: { userId: DEFAULT_USER_ID },
-      include: { track: true },
-      orderBy: { playedAt: 'desc' },
-      take: 24,
-    });
-
-    const seen = new Set<string>();
-    const uniqueRecentTracks: any[] = [];
-    for (const h of recentHistory) {
-      if (h.track && !seen.has(h.track.youtubeId)) {
-        seen.add(h.track.youtubeId);
-        uniqueRecentTracks.push(h.track);
-      }
-      if (uniqueRecentTracks.length >= 6) {
-        break;
-      }
-    }
-
-    // Favorites from DB
-    const favs = await prisma.favorite.findMany({
-      where: { userId: DEFAULT_USER_ID },
-      include: { track: true },
-      orderBy: { createdAt: 'desc' },
-      take: 6,
-    });
-
     // Featured tracks from YouTube API
     let featured: SearchResult[] = [];
     try {
@@ -51,12 +21,13 @@ export async function GET() {
       newReleases = [];
     }
 
+    // recentlyPlayed and favorites are now served from localStorage (client-side stores)
     return NextResponse.json({
-      recentlyPlayed: uniqueRecentTracks,
-      favorites: favs.map((f) => f.track),
+      recentlyPlayed: [],
+      favorites: [],
       trending: featured,
       recommended: featured.slice(0, 6),
-      newReleases: newReleases,
+      newReleases,
     });
   } catch (error) {
     console.error('[Home API]', error);
@@ -65,6 +36,7 @@ export async function GET() {
       favorites: [],
       trending: [],
       recommended: [],
+      newReleases: [],
     });
   }
 }

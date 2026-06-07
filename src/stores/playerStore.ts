@@ -222,7 +222,6 @@ export const usePlayerStore = create<PlayerStore>()(
           queue: state.queue,
           currentTrack: state.currentTrack,
           historyQueue: state.historyQueue,
-          playbackPosition: state.playbackPosition,
         }),
       }
     )

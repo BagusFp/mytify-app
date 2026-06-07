@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { use, useState, useEffect } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, ListMusic, Play, Shuffle } from 'lucide-react';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { usePlayerStore } from '@/stores/playerStore';
-import { Playlist, Track } from '@/types';
+import { Track } from '@/types';
 import { TrackItem } from '@/components/track/TrackItem';
 import { Button } from '@/components/ui/button';
 
@@ -15,30 +15,39 @@ interface PlaylistPageProps {
 }
 
 export default function PlaylistPage({ params }: PlaylistPageProps) {
-  const [playlist, setPlaylist] = useState<Playlist | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const { playTrack, setQueue, toggleShuffle } = usePlayerStore();
+  const { id } = use(params);
+  const { playlists } = useLibraryStore();
+  const { playTrack, setQueue } = usePlayerStore();
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    async function load() {
-      const { id } = await params;
-      try {
-        const res = await fetch(`/api/playlists/${id}`);
-        if (!res.ok) return notFound();
-        const data = await res.json();
-        setPlaylist(data);
-      } catch {
-        // handle
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    load();
-  }, [params]);
+    setMounted(true);
+  }, []);
 
-  const tracks: Track[] = playlist?.tracks
-    ?.map((pt) => pt.track)
-    .filter((t): t is Track => !!t) ?? [];
+  if (!mounted) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="skeleton h-8 w-32 rounded" />
+        <div className="flex gap-6 items-end">
+          <div className="skeleton w-32 h-32 rounded-xl" />
+          <div className="space-y-2">
+            <div className="skeleton h-10 w-64 rounded" />
+            <div className="skeleton h-5 w-40 rounded" />
+          </div>
+        </div>
+        <div className="space-y-3 pt-6">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="skeleton h-14 rounded-md" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const playlist = playlists.find((p) => p.id === id);
+  if (!playlist) return notFound();
+
+  const tracks: Track[] = playlist.tracks.map((pt) => pt.track);
 
   const handlePlayAll = () => {
     if (tracks.length === 0) return;
@@ -54,19 +63,6 @@ export default function PlaylistPage({ params }: PlaylistPageProps) {
     setQueue(rest);
     playTrack(first);
   };
-
-  if (isLoading) {
-    return (
-      <div className="p-6">
-        <div className="skeleton h-8 w-48 rounded mb-4" />
-        <div className="space-y-3">
-          {[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-14 rounded-md" />)}
-        </div>
-      </div>
-    );
-  }
-
-  if (!playlist) return null;
 
   return (
     <div className="page-enter">

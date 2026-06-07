@@ -7,6 +7,8 @@ import { Clock, Heart, TrendingUp, Sparkles, Search, ChevronRight, Play } from '
 import { Track } from '@/types';
 import { TrackCard } from '@/components/track/TrackCard';
 import { usePlayerStore } from '@/stores/playerStore';
+import { useFavoritesStore } from '@/stores/favoritesStore';
+import { useHistoryStore } from '@/stores/historyStore';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -99,9 +101,15 @@ export default function HomePage() {
   const [data, setData] = useState<HomeData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { playTrack } = usePlayerStore();
+  const { favorites: localFavorites } = useFavoritesStore();
+  const { history: localHistory } = useHistoryStore();
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
+  // Derive local data
+  const recentlyPlayed: Track[] = localHistory.slice(0, 6).map((e) => e.track);
+  const favoriteTracks: Track[] = localFavorites.slice(0, 6).map((f) => f.track);
 
   useEffect(() => {
     async function loadHome() {
@@ -155,18 +163,18 @@ export default function HomePage() {
         </div>
 
         {/* Recently Played */}
-        {(isLoading || (data?.recentlyPlayed && data.recentlyPlayed.length > 0)) && (
+        {recentlyPlayed.length > 0 && (
           <section>
             <SectionHeader title="Recently Played" icon={Clock} href="/history" />
-            {isLoading ? <SkeletonGrid count={6} /> : <TrackGrid tracks={data!.recentlyPlayed} />}
+            <TrackGrid tracks={recentlyPlayed} />
           </section>
         )}
 
         {/* Favorites */}
-        {(isLoading || (data?.favorites && data.favorites.length > 0)) && (
+        {favoriteTracks.length > 0 && (
           <section>
             <SectionHeader title="Your Favorites" icon={Heart} href="/favorites" />
-            {isLoading ? <SkeletonGrid count={6} /> : <TrackGrid tracks={data!.favorites} />}
+            <TrackGrid tracks={favoriteTracks} />
           </section>
         )}
 
@@ -235,53 +243,45 @@ export default function HomePage() {
         </div>
 
         {/* Recently Played (Compact List) */}
-        {(isLoading || (data?.recentlyPlayed && data.recentlyPlayed.length > 0)) && (
+        {recentlyPlayed.length > 0 && (
           <section className="px-1">
             <SectionHeader title="Recently Played" icon={Clock} href="/history" />
-            {isLoading ? (
-              <SkeletonMobileList />
-            ) : (
-              <div className="space-y-2">
-                {data!.recentlyPlayed.slice(0, 4).map((track) => (
-                  <div
-                    key={track.youtubeId}
-                    onClick={() => playTrack(track)}
-                    className="flex items-center gap-3 p-2 bg-zinc-900/40 active:bg-zinc-900 rounded-lg cursor-pointer h-16 transition-colors"
-                  >
-                    <div className="relative w-12 h-12 rounded-md overflow-hidden flex-shrink-0 bg-zinc-800">
-                      <Image src={track.thumbnail} alt={track.title} fill className="object-cover" unoptimized />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold truncate text-white leading-tight">{track.title}</p>
-                      <p className="text-[11px] text-zinc-400 truncate mt-1">{track.channelName}</p>
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-300 flex-shrink-0 active:scale-90 transition-transform">
-                      <Play className="w-4 h-4 fill-current ml-0.5" />
-                    </div>
+            <div className="space-y-2">
+              {recentlyPlayed.slice(0, 4).map((track) => (
+                <div
+                  key={track.youtubeId}
+                  onClick={() => playTrack(track)}
+                  className="flex items-center gap-3 p-2 bg-zinc-900/40 active:bg-zinc-900 rounded-lg cursor-pointer h-16 transition-colors"
+                >
+                  <div className="relative w-12 h-12 rounded-md overflow-hidden flex-shrink-0 bg-zinc-800">
+                    <Image src={track.thumbnail} alt={track.title} fill className="object-cover" unoptimized />
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold truncate text-white leading-tight">{track.title}</p>
+                    <p className="text-[11px] text-zinc-400 truncate mt-1">{track.channelName}</p>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-300 flex-shrink-0 active:scale-90 transition-transform">
+                    <Play className="w-4 h-4 fill-current ml-0.5" />
+                  </div>
+                </div>
+              ))}
+            </div>
           </section>
         )}
 
         {/* Favorites (Horizontal Scrollable) */}
-        {(isLoading || (data?.favorites && data.favorites.length > 0)) && (
+        {favoriteTracks.length > 0 && (
           <section>
             <div className="px-1">
               <SectionHeader title="Your Favorites" icon={Heart} href="/favorites" />
             </div>
-            {isLoading ? (
-              <SkeletonHorizontalScroll />
-            ) : (
-              <div className="flex gap-4 overflow-x-auto pb-2 pt-1 snap-x no-scrollbar px-1">
-                {data!.favorites.map((track) => (
-                  <div key={track.youtubeId} className="snap-start flex-shrink-0 w-36">
-                    <TrackCard track={track} tracks={data!.favorites} className="bg-zinc-900/60 border border-zinc-800/40 p-2" />
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="flex gap-4 overflow-x-auto pb-2 pt-1 snap-x no-scrollbar px-1">
+              {favoriteTracks.map((track) => (
+                <div key={track.youtubeId} className="snap-start flex-shrink-0 w-36">
+                  <TrackCard track={track} tracks={favoriteTracks} className="bg-zinc-900/60 border border-zinc-800/40 p-2" />
+                </div>
+              ))}
+            </div>
           </section>
         )}
 

@@ -48,7 +48,7 @@ export function MiniPlayer() {
   if (!currentTrack) return null;
 
   return (
-    <div className="fixed bottom-14 md:bottom-0 left-0 right-0 z-50 bg-zinc-950/95 backdrop-blur-lg border-t border-zinc-900 player-safe-bottom">
+    <div className="fixed bottom-[calc(56px+env(safe-area-inset-bottom,0px))] md:bottom-0 left-0 right-0 z-50 bg-zinc-950/95 backdrop-blur-lg border-t border-zinc-900">
       {/* Progress bar on top (Mobile only) */}
       <div
         className="w-full h-[2px] bg-white/10 cursor-pointer md:hidden"
